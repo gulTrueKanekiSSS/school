@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import ru.hogwarts.school.model.Faculty;
 import ru.hogwarts.school.repository.FacultyRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,4 +45,9 @@ public class FacultyService {
                 })
                 .orElseThrow(() -> new RuntimeException("Faculty not found with id: " + id));
     }
+
+    public Collection<Faculty> findByNameLike(String request){
+        return facultyRepository.findByNameContainsIgnoreCase(request);
+    }
+
 }
