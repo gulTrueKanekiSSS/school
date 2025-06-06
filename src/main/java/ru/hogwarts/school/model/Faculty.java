@@ -2,6 +2,7 @@ package ru.hogwarts.school.model;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -26,6 +27,7 @@ public class Faculty {
     public Faculty(Long id, String name) {
         this.id = id;
         this.name = name;
+        this.students = new ArrayList<>();
     }
 
     public String getName() {
