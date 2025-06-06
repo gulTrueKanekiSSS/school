@@ -62,4 +62,5 @@ public class DataController {
         long longSum = n * (n + 1) / 2; // 500000500000
         return (int) longSum; // приведение к int (будет переполнение так же, как в исходном reduce)
     }
+
 }

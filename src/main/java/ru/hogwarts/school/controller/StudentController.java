@@ -28,10 +28,11 @@ import java.util.List;
 @RestController
 public class StudentController {
     private final StudentService studentService;
-
+    private final StudentRepository studentRepository;
     @Autowired
-    StudentController(StudentService studentService){
+    StudentController(StudentService studentService, StudentRepository studentRepository){
         this.studentService = studentService;
+        this.studentRepository = studentRepository;
     }
 
     @GetMapping("students/")
@@ -150,6 +151,71 @@ public class StudentController {
             response.setContentLength((int) avatar.getFileSize());
             is.transferTo(os);
         }
+    }
+
+    @GetMapping("/students/print-parallel")
+    public ResponseEntity<String> printParallel() {
+        List<Student> students = studentRepository.findAll();
+        int count = Math.min(students.size(), 6);
+
+        for (int i = 0; i < Math.min(2, count); i++) {
+            System.out.println(students.get(i).getName());
+        }
+
+        if (count > 2) {
+            Thread t1 = new Thread(() -> {
+                for (int i = 2; i < Math.min(4, count); i++) {
+                    System.out.println(students.get(i).getName());
+                }
+            });
+            t1.start();
+        }
+
+        if (count > 4) {
+            Thread t2 = new Thread(() -> {
+                for (int i = 4; i < Math.min(6, count); i++) {
+                    System.out.println(students.get(i).getName());
+                }
+            });
+            t2.start();
+        }
+
+        return ResponseEntity.ok("Print-parallel started");
+    }
+
+
+    @GetMapping("/students/print-synchronized")
+    public ResponseEntity<String> printSynchronized() {
+        List<Student> students = studentRepository.findAll();
+        int count = Math.min(students.size(), 6);
+
+        for (int i = 0; i < Math.min(2, count); i++) {
+            printName(students.get(i).getName());
+        }
+
+        if (count > 2) {
+            Thread t1 = new Thread(() -> {
+                for (int i = 2; i < Math.min(4, count); i++) {
+                    printName(students.get(i).getName());
+                }
+            });
+            t1.start();
+        }
+
+        if (count > 4) {
+            Thread t2 = new Thread(() -> {
+                for (int i = 4; i < Math.min(6, count); i++) {
+                    printName(students.get(i).getName());
+                }
+            });
+            t2.start();
+        }
+
+        return ResponseEntity.ok("Print-synchronized started");
+    }
+
+    private synchronized void printName(String name) {
+        System.out.println(name);
     }
 }
 
