@@ -1,7 +1,12 @@
 package ru.hogwarts.school.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 @Entity
@@ -15,12 +20,18 @@ public class Faculty {
 
     private String name;
 
+    @OneToMany(mappedBy = "faculty", cascade = CascadeType.REMOVE)
+    @JsonManagedReference
+    @JsonIgnore
+    private List<Student> students;
+
     public Faculty(){
 
     }
     public Faculty(Long id, String name) {
         this.id = id;
         this.name = name;
+        this.students = new ArrayList<>();
     }
 
     public String getName() {
@@ -37,6 +48,10 @@ public class Faculty {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Collection<Student> getStudents(){
+        return students;
     }
 
     @Override
