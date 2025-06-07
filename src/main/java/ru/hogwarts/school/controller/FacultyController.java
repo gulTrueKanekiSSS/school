@@ -55,11 +55,11 @@ public class FacultyController {
     }
 
     @DeleteMapping("/delete_faculty/{id}")
-    public ResponseEntity<Void> deleteFaculty(@PathVariable Long id){
-        try{
+    public ResponseEntity<Void> deleteFaculty(@PathVariable Long id) {
+        try {
             facultyService.deleteById(id);
             return ResponseEntity.ok().build();
-        } catch (RuntimeException e){
+        } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
     }

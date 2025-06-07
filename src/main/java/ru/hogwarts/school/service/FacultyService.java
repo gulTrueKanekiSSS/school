@@ -1,5 +1,6 @@
 package ru.hogwarts.school.service;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.hogwarts.school.model.Faculty;
@@ -41,6 +42,9 @@ public class FacultyService {
 
     public void deleteById(Long id){
         logger.info("Работа метода deleteById");
+        if (!facultyRepository.existsById(id)) {
+            throw new EntityNotFoundException("Faculty not found");
+        }
         facultyRepository.deleteById(id);
     }
 

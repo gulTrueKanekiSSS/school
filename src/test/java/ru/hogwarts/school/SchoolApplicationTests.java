@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,8 +15,11 @@ import org.springframework.http.*;
 import ru.hogwarts.school.controller.FacultyController;
 import ru.hogwarts.school.controller.StudentController;
 import ru.hogwarts.school.dto.StudentDto;
+import ru.hogwarts.school.dto.StudentResponseDto;
 import ru.hogwarts.school.model.Faculty;
 import ru.hogwarts.school.model.Student;
+import ru.hogwarts.school.repository.FacultyRepository;
+import ru.hogwarts.school.repository.StudentRepository;
 
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 class SchoolApplicationTests {
@@ -32,6 +36,18 @@ class SchoolApplicationTests {
 	@Autowired
 	private TestRestTemplate restTemplate;
 
+	@Autowired
+	private StudentRepository studentRepository;
+
+	@Autowired
+	FacultyRepository facultyRepository;
+
+	@BeforeEach
+	void cleanDb() {
+		studentRepository.deleteAll();
+		facultyRepository.deleteAll();
+	}
+
 	@Test
 	public void contextLoads() throws Exception {
 		Assertions.assertThat(studentController).isNotNull();
@@ -45,10 +61,21 @@ class SchoolApplicationTests {
 	}
 
 	@Test
-	public void testGetfaculty() throws Exception {
-		Assertions
-				.assertThat(this.restTemplate.getForObject("http://localhost:" + port + "/faculty/" + "102", String.class))
-				.isNotNull();
+	void testGetFaculty() {
+		Faculty saved = facultyRepository.save(new Faculty(null, "TestFaculty"));
+		Long id = saved.getId();
+
+		ResponseEntity<Faculty> resp = restTemplate.getForEntity(
+				"http://localhost:" + port + "/faculty/{id}",
+				Faculty.class,
+				id
+		);
+
+		assertEquals(HttpStatus.OK, resp.getStatusCode());
+		Faculty body = resp.getBody();
+		assertNotNull(body, "Тело ответа должно быть не null");
+		assertEquals(id, body.getId());
+		assertEquals("TestFaculty", body.getName());
 	}
 
 	@Test
@@ -121,9 +148,18 @@ class SchoolApplicationTests {
 
 	@Test
 	public void testGetStudent() throws Exception {
-		Assertions
-				.assertThat(this.restTemplate.getForObject("http://localhost:" + port + "/student/" + "102", String.class))
-				.isNotNull();
+		Student saved = studentRepository.save(new Student(null, "TestName", 99));
+		Long id = saved.getId();
+		String url = "http://localhost:" + port + "/student/{id}";
+		ResponseEntity<Student> response = restTemplate.getForEntity(url, Student.class, id);
+
+		Assertions.assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+		Student body = response.getBody();
+		Assertions.assertThat(body).isNotNull();
+		Assertions.assertThat(body.getId()).isEqualTo(id);
+		Assertions.assertThat(body.getName()).isEqualTo("TestName");
+		Assertions.assertThat(body.getAge()).isEqualTo(99);
 	}
 
 	@Test
@@ -139,58 +175,83 @@ class SchoolApplicationTests {
 	}
 
 	@Test
-	public void testUpdateStudent() throws Exception {
-		StudentDto student = new StudentDto();
-		student.setName("Initial Name");
-		student.setAge(13);
-		student.setFacultyId(102L);
+	void testUpdateStudent() {
+		Faculty savedFaculty = facultyRepository
+				.save(new Faculty(null, "Test Faculty"));
 
-		ResponseEntity<StudentDto> createResponse = restTemplate.postForEntity(
-				"http://localhost:" + port + "/create_student",
-				student,
-				StudentDto.class
-		);
+		StudentDto dto = new StudentDto();
+		dto.setName("Initial Name");
+		dto.setAge(13);
+		dto.setFacultyId(savedFaculty.getId());
 
-		assertEquals(HttpStatus.OK, createResponse.getStatusCode());
-		StudentDto createdStudent = createResponse.getBody();
-		assertNotNull(createdStudent);
+		ResponseEntity<StudentResponseDto> createResp = restTemplate
+				.postForEntity(
+						"http://localhost:" + port + "/create_student",
+						dto,
+						StudentResponseDto.class
+				);
+		assertEquals(HttpStatus.OK, createResp.getStatusCode());
+		StudentResponseDto created = createResp.getBody();
+		assertNotNull(created);
+		Long studentId = created.getId();
 
-		createdStudent.setName("Updated Name");
-		createdStudent.setAge(22);
+		StudentDto updateDto = new StudentDto();
+		updateDto.setName("Updated Name");
+		updateDto.setAge(22);
+		updateDto.setFacultyId(savedFaculty.getId());
 
-		HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		HttpEntity<StudentDto> updateRequest = new HttpEntity<>(createdStudent, headers);
+		HttpEntity<StudentDto> request = new HttpEntity<>(updateDto);
+		String url = "http://localhost:" + port + "/update_student/{id}";
 
-		String url = "http://localhost:" + port + "/update_student/" + 2;
-		ResponseEntity<String> updateResponse = restTemplate.exchange(url, HttpMethod.PUT, updateRequest, String.class);
+		ResponseEntity<StudentResponseDto> updateResp = restTemplate
+				.exchange(
+						url,
+						HttpMethod.PUT,
+						request,
+						StudentResponseDto.class,
+						studentId
+				);
+		assertEquals(HttpStatus.OK, updateResp.getStatusCode());
+		StudentResponseDto updated = updateResp.getBody();
+		assertNotNull(updated);
 
-		assertEquals(HttpStatus.OK, updateResponse.getStatusCode());
+		assertEquals(studentId, updated.getId());
+		assertEquals("Updated Name", updated.getName());
+		assertEquals(22, updated.getAge());
+		assertEquals("Test Faculty", updated.getFacultyName());
 	}
+
 	@Test
-	public void testDeleteStudent() throws Exception {
-		StudentDto student = new StudentDto();
-		student.setName("Initial Name");
-		student.setAge(12);
-		student.setFacultyId(102L);
+	void testDeleteStudent() throws Exception {
+		// 1) Сохраняем факультет
+		Faculty savedFaculty = facultyRepository.save(new Faculty(null, "TestDept"));
 
-		ResponseEntity<Student> createResponse = restTemplate.postForEntity(
+		// 2) Подготавливаем DTO для создания
+		StudentDto createDto = new StudentDto();
+		createDto.setName("Initial Name");
+		createDto.setAge(12);
+		createDto.setFacultyId(savedFaculty.getId());
+
+		// 3) Создаём студента через контроллер и читаем ответ как StudentResponseDto
+		ResponseEntity<StudentResponseDto> createResponse = restTemplate.postForEntity(
 				"http://localhost:" + port + "/create_student",
-				student,
-				Student.class
+				createDto,
+				StudentResponseDto.class
 		);
-
 		assertEquals(HttpStatus.OK, createResponse.getStatusCode());
-		Student createdStudent = createResponse.getBody();
-		assertNotNull(createdStudent);
-		Long id = createdStudent.getId();
+		StudentResponseDto created = createResponse.getBody();
+		assertNotNull(created);
+		Long studentId = created.getId();
 
-		createdStudent.setName("Updated Name");
+		// 4) Удаляем по id
+		restTemplate.delete("http://localhost:" + port + "/delete_student/{id}", studentId);
 
-		restTemplate.delete("http://localhost:" + port + "/delete_student/" + id);
-
-		ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/student/" + id, String.class);
-		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+		// 5) Проверяем, что GET /student/{id} теперь возвращает 404
+		ResponseEntity<String> getResponse = restTemplate.getForEntity(
+				"http://localhost:" + port + "/student/{id}",
+				String.class,
+				studentId
+		);
+		assertEquals(HttpStatus.NOT_FOUND, getResponse.getStatusCode());
 	}
-
 }
